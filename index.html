@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff8ef">
+  <meta name="description" content="Vòng quay may mắn – Ai bao nước hôm nay? Trò chơi quay số vui nhộn dành cho bạn bè, đồng nghiệp.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" href="./assets/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Ai bao nước hôm nay? · Vòng quay may mắn</title>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="background-orb orb-one" aria-hidden="true"></div>
+  <div class="background-orb orb-two" aria-hidden="true"></div>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="./" id="home-link" aria-label="Vòng quay may mắn – về trang bắt đầu">
+        <span class="brand-mark" aria-hidden="true">🥤</span>
+        <span class="brand-copy"><strong>Vòng quay may mắn</strong><small>TÂN HIỆP · FUN GAME</small></span>
+      </a>
+      <div class="topbar-actions">
+        <button type="button" class="icon-button" id="sound-toggle" title="Bật hoặc tắt âm thanh" aria-label="Tắt âm thanh" aria-pressed="true"><span id="sound-icon" aria-hidden="true">🔊</span><span class="hide-on-mobile" id="sound-text">Có âm thanh</span></button>
+        <button type="button" class="icon-button" id="history-toggle" title="Xem lịch sử 10 vòng gần nhất"><span aria-hidden="true">📋</span><span class="hide-on-mobile">Lịch sử</span></button>
+        <button type="button" class="icon-button fullscreen-control" id="fullscreen-toggle" title="Bật chế độ toàn màn hình"><span aria-hidden="true">⛶</span><span class="hide-on-mobile">Toàn màn hình</span></button>
+      </div>
+    </header>
+    <main id="main-content">
+      <section class="screen screen-setup" id="setup-screen" aria-labelledby="setup-title">
+        <div class="intro-heading">
+          <span class="eyebrow"><span class="sparkle" aria-hidden="true">✦</span> Trò chơi vui giữa giờ giải lao <span class="sparkle" aria-hidden="true">✦</span></span>
+          <h1 id="setup-title">Hôm nay <span class="heading-gradient">ai bao nước?</span> 🧋</h1>
+          <p>Rủ hội bạn cùng quay số. Ai quay trúng số nhỏ nhất thì mời nước cả nhóm!</p>
+        </div>
+        <div class="setup-layout">
+          <div class="panel setup-panel">
+            <div class="panel-title-row"><div><span class="section-kicker">BƯỚC 01</span><h2>Chuẩn bị người chơi</h2></div><span class="step-symbol" aria-hidden="true">✍️</span></div>
+            <div class="counter-card"><div><strong>Số người tham gia</strong><small>Hỗ trợ từ 2 đến 20 người</small></div><div class="counter-control"><button type="button" id="decrease-count" aria-label="Giảm số người">−</button><output id="player-count" aria-live="polite">5</output><button type="button" id="increase-count" aria-label="Tăng số người">+</button></div></div>
+            <div class="players-heading"><label>Danh sách người chơi</label><small>Có thể để trống tên</small></div>
+            <div class="player-inputs" id="player-inputs"></div>
+            <div class="setup-actions"><button type="button" class="primary-button" id="start-button">🎡 BẮT ĐẦU TRÒ CHƠI <span aria-hidden="true">→</span></button></div>
+            <p class="small-note"><span aria-hidden="true">🔒</span> Không cần đăng nhập · Dữ liệu lưu trên chính thiết bị này</p>
+          </div>
+          <div class="preview-panel" aria-label="Xem trước vòng quay">
+            <div class="preview-stars" aria-hidden="true">✦ ✳ ✦</div>
+            <div class="preview-caption"><span class="pink-pill">SẴN SÀNG CHƯA?</span><h2>Quay phát biết ngay!</h2><p>Mỗi người một con số, không lo trùng kết quả.</p></div>
+            <div class="wheel-outer preview-wheel-outer"><div class="wheel-shadow"><canvas id="preview-wheel" class="wheel-canvas" width="900" height="900" role="img" aria-label="Vòng quay xem trước"></canvas><div class="wheel-hub"><span>LUCKY</span><strong>SPIN</strong></div></div><div class="wheel-pointer" aria-hidden="true"></div></div>
+            <div class="preview-bottom"><span>🎵 Âm thanh vui nhộn</span><span>🎉 Công bố bất ngờ</span></div>
+          </div>
+        </div>
+      </section>
+      <section class="screen screen-game" id="game-screen" hidden aria-labelledby="game-title">
+        <div class="game-heading"><div><span class="eyebrow">🎡 ĐẾN LƯỢT QUAY RỒI!</span><h1 id="game-title">Vòng quay <span class="heading-gradient">may mắn</span></h1></div><button type="button" id="reset-active" class="subtle-button">↻ Vòng mới</button></div>
+        <div class="game-layout">
+          <div class="panel spin-panel">
+            <div class="spin-status"><span class="live-dot" aria-hidden="true"></span><span id="spin-status-text">Sẵn sàng</span><span id="turn-counter" class="turn-counter">LƯỢT 1 / 5</span></div>
+            <div class="wheel-stage"><div class="stage-rays" aria-hidden="true"></div><div class="wheel-outer game-wheel-outer"><div class="wheel-shadow"><div class="spinner-rotor" id="spinner-rotor"><canvas id="game-wheel" class="wheel-canvas" width="900" height="900" role="img" aria-label="Vòng quay may mắn"></canvas></div><div class="wheel-hub"><span>QUAY</span><strong>NGAY!</strong></div></div><div class="wheel-pointer" aria-label="Kim chỉ số trúng"></div></div></div>
+            <div class="current-person"><span class="person-label">NGƯỜI ĐANG ĐẾN LƯỢT</span><strong id="current-name">Người 1</strong><span id="game-guidance">Nhấn nút để thử vận may của bạn!</span></div>
+            <div class="game-primary-actions"><button type="button" id="spin-button" class="primary-button spin-button">🎯 QUAY MAY MẮN!</button></div>
+            <p class="small-note center-note">✨ Số đã quay vẫn hiện trên vòng nhưng không thể trúng lần nữa.</p>
+            <div class="result-card" id="result-card" hidden aria-live="polite" aria-atomic="true"><div class="result-rays">✨</div><span class="result-label">KẾT QUẢ LƯỢT NÀY</span><p><strong id="result-person"></strong> nhận được</p><span id="result-number" class="big-result">04</span><button type="button" class="primary-button" id="continue-button">NGƯỜI TIẾP THEO →</button><p id="auto-summary-note" class="auto-summary-note" hidden>Tự động công bố kết quả chung sau ít giây...</p></div>
+          </div>
+          <aside class="panel roster-panel"><div class="panel-title-row"><div><span class="section-kicker">BẢNG THEO DÕI</span><h2>Ai đã quay rồi?</h2></div><span class="roster-icon" aria-hidden="true">🏁</span></div><div class="progress-head"><span>Tiến độ vòng chơi</span><strong id="progress-fraction">0 / 5</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar" style="width:0%"></div></div><div id="game-roster" class="game-roster"></div><div class="tip-card"><span aria-hidden="true">💡</span><p><strong>Luật chơi:</strong> Người nhận số nhỏ nhất sẽ mời nước những người còn lại. Kết quả chính thức công bố cuối vòng.</p></div></aside>
+        </div>
+      </section>
+      <section class="screen screen-summary" id="summary-screen" hidden aria-labelledby="summary-title">
+        <div class="summary-top"><span class="pink-pill">🎊 VÒNG QUAY ĐÃ HOÀN TẤT</span><h1 id="summary-title">Đã tìm ra người <span class="heading-gradient">bao nước!</span></h1><p>Không còn phải tranh luận xem hôm nay ai là người may mắn nhất nữa!</p></div>
+        <div class="summary-layout"><div class="winner-card"><div class="winner-emoji" aria-hidden="true">🏆</div><div class="winner-kicker">CHÚC MỪNG NHÂN VẬT HÔM NAY</div><h2 id="winner-name">Người chơi</h2><div class="winning-number"><small>TRÚNG SỐ</small><strong id="winner-number">01</strong></div><p id="winner-message">Hôm nay bạn mời nước cả nhóm!</p><div class="drink-row" aria-hidden="true">🥤 🧋 ☕ 🍹</div></div><div class="panel leaderboard-panel"><div class="panel-title-row"><div><span class="section-kicker">KẾT QUẢ CHUNG</span><h2>Bảng kết quả</h2></div><span class="roster-icon" aria-hidden="true">📋</span></div><div class="leaderboard" id="leaderboard"></div><div class="summary-actions"><button type="button" id="replay-button" class="primary-button">🎡 CHƠI VÒNG MỚI</button><button type="button" id="edit-button" class="outline-button">✏️ ĐỔI NGƯỜI CHƠI</button></div></div></div>
+      </section>
+    </main>
+    <footer class="footer"><span>✨ Tân Hiệp · Vui một chút, gắn kết nhiều hơn</span><span>V1.0 · Chơi công bằng, không trùng số</span></footer>
+  </div>
+  <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
+  <div role="status" id="toast" class="toast" aria-live="polite"></div>
+  <dialog class="history-dialog" id="history-dialog" aria-labelledby="history-title"><div class="dialog-header"><div><span class="section-kicker">ĐÃ LƯU TRÊN THIẾT BỊ</span><h2 id="history-title">📋 Lịch sử 10 vòng gần nhất</h2></div><button type="button" class="dialog-close" id="close-history" aria-label="Đóng">×</button></div><p class="history-explain">Lịch sử chỉ được lưu trên trình duyệt này, không đồng bộ trực tuyến.</p><div id="history-list" class="history-list"></div><div class="dialog-bottom"><button type="button" id="clear-history" class="outline-button danger-text">Xóa lịch sử</button><button type="button" id="done-history" class="primary-button">ĐÓNG</button></div></dialog>
+</body>
+</html>
