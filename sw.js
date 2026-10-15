@@ -1,6 +1,6 @@
 /* Cache the public app shell for offline visits after the first successful load. */
-const CACHE_NAME = 'tan-hiep-water-wheel-v1.0.0';
-const SHELL = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './assets/icon-192.png', './assets/icon-512.png'];
+const CACHE_NAME = 'tan-hiep-water-wheel-v1.1.0';
+const SHELL = ['./', './index.html', './styles.css?v=1.1.0', './app.js?v=1.1.0', './manifest.webmanifest', './assets/icon-192.png', './assets/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });

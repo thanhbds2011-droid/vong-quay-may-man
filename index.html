@@ -11,9 +11,9 @@
   <link rel="icon" href="./assets/icon-192.png" sizes="192x192" type="image/png">
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=1.1.0">
   <title>Ai bao nước hôm nay? · Vòng quay may mắn</title>
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=1.1.0" defer></script>
 </head>
 <body>
   <div class="background-orb orb-one" aria-hidden="true"></div>
@@ -48,7 +48,7 @@
           </div>
           <div class="preview-panel" aria-label="Xem trước vòng quay">
             <div class="preview-stars" aria-hidden="true">✦ ✳ ✦</div>
-            <div class="preview-caption"><span class="pink-pill">SẴN SÀNG CHƯA?</span><h2>Quay phát biết ngay!</h2><p>Mỗi người một con số, không lo trùng kết quả.</p></div>
+            <div class="preview-caption"><span class="pink-pill">SẴN SÀNG CHƯA?</span><h2>Quay phát biết ngay!</h2><p>Ai cũng được quay đủ số; trùng nhau thì cùng quay lại!</p></div>
             <div class="wheel-outer preview-wheel-outer"><div class="wheel-shadow"><canvas id="preview-wheel" class="wheel-canvas" width="900" height="900" role="img" aria-label="Vòng quay xem trước"></canvas><div class="wheel-hub"><span>LUCKY</span><strong>SPIN</strong></div></div><div class="wheel-pointer" aria-hidden="true"></div></div>
             <div class="preview-bottom"><span>🎵 Âm thanh vui nhộn</span><span>🎉 Công bố bất ngờ</span></div>
           </div>
@@ -62,10 +62,10 @@
             <div class="wheel-stage"><div class="stage-rays" aria-hidden="true"></div><div class="wheel-outer game-wheel-outer"><div class="wheel-shadow"><div class="spinner-rotor" id="spinner-rotor"><canvas id="game-wheel" class="wheel-canvas" width="900" height="900" role="img" aria-label="Vòng quay may mắn"></canvas></div><div class="wheel-hub"><span>QUAY</span><strong>NGAY!</strong></div></div><div class="wheel-pointer" aria-label="Kim chỉ số trúng"></div></div></div>
             <div class="current-person"><span class="person-label">NGƯỜI ĐANG ĐẾN LƯỢT</span><strong id="current-name">Người 1</strong><span id="game-guidance">Nhấn nút để thử vận may của bạn!</span></div>
             <div class="game-primary-actions"><button type="button" id="spin-button" class="primary-button spin-button">🎯 QUAY MAY MẮN!</button></div>
-            <p class="small-note center-note">✨ Số đã quay vẫn hiện trên vòng nhưng không thể trúng lần nữa.</p>
-            <div class="result-card" id="result-card" hidden aria-live="polite" aria-atomic="true"><div class="result-rays">✨</div><span class="result-label">KẾT QUẢ LƯỢT NÀY</span><p><strong id="result-person"></strong> nhận được</p><span id="result-number" class="big-result">04</span><button type="button" class="primary-button" id="continue-button">NGƯỜI TIẾP THEO →</button><p id="auto-summary-note" class="auto-summary-note" hidden>Tự động công bố kết quả chung sau ít giây...</p></div>
+            <p class="small-note center-note" id="wheel-legend">✨ Mọi người quay độc lập. Trùng số thì cùng quay lại ở vòng phụ.</p>
+            <div class="review-card" id="review-card" hidden aria-live="polite"><div class="review-icon" aria-hidden="true">🔁</div><h3 id="review-title">CÓ SỐ TRÙNG!</h3><p id="review-message"></p><p class="review-explain">Người không trùng được giữ số. Người trùng cùng quay lại với các số chưa chốt. Trong một vòng phụ, các lượt quay vẫn độc lập với nhau.</p><button type="button" class="primary-button" id="next-stage-button">🔁 BẮT ĐẦU VÒNG PHỤ</button></div><div class="result-card" id="result-card" hidden aria-live="polite" aria-atomic="true"><div class="result-rays">✨</div><span class="result-label">KẾT QUẢ LƯỢT NÀY</span><p><strong id="result-person"></strong> nhận được</p><span id="result-number" class="big-result">04</span><button type="button" class="primary-button" id="continue-button">NGƯỜI TIẾP THEO →</button><p id="auto-summary-note" class="auto-summary-note" hidden>Tự động công bố kết quả chung sau ít giây...</p></div>
           </div>
-          <aside class="panel roster-panel"><div class="panel-title-row"><div><span class="section-kicker">BẢNG THEO DÕI</span><h2>Ai đã quay rồi?</h2></div><span class="roster-icon" aria-hidden="true">🏁</span></div><div class="progress-head"><span>Tiến độ vòng chơi</span><strong id="progress-fraction">0 / 5</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar" style="width:0%"></div></div><div id="game-roster" class="game-roster"></div><div class="tip-card"><span aria-hidden="true">💡</span><p><strong>Luật chơi:</strong> Người nhận số nhỏ nhất sẽ mời nước những người còn lại. Kết quả chính thức công bố cuối vòng.</p></div></aside>
+          <aside class="panel roster-panel"><div class="panel-title-row"><div><span class="section-kicker">BẢNG THEO DÕI</span><h2>Ai đã quay rồi?</h2></div><span class="roster-icon" aria-hidden="true">🏁</span></div><div class="progress-head"><span id="progress-label">Tiến độ vòng đầu</span><strong id="progress-fraction">0 / 5</strong></div><div class="progress-track"><div id="progress-bar" class="progress-bar" style="width:0%"></div></div><div id="game-roster" class="game-roster"></div><div class="tip-card"><span aria-hidden="true">💡</span><p><strong>Luật chơi:</strong> Tất cả được quay đủ các số. Sau mỗi lượt cả nhóm, ai trùng số cùng quay lại. Chỉ công bố người mời nước khi mỗi người có một số riêng biệt.</p></div></aside>
         </div>
       </section>
       <section class="screen screen-summary" id="summary-screen" hidden aria-labelledby="summary-title">
@@ -73,7 +73,7 @@
         <div class="summary-layout"><div class="winner-card"><div class="winner-emoji" aria-hidden="true">🏆</div><div class="winner-kicker">CHÚC MỪNG NHÂN VẬT HÔM NAY</div><h2 id="winner-name">Người chơi</h2><div class="winning-number"><small>TRÚNG SỐ</small><strong id="winner-number">01</strong></div><p id="winner-message">Hôm nay bạn mời nước cả nhóm!</p><div class="drink-row" aria-hidden="true">🥤 🧋 ☕ 🍹</div></div><div class="panel leaderboard-panel"><div class="panel-title-row"><div><span class="section-kicker">KẾT QUẢ CHUNG</span><h2>Bảng kết quả</h2></div><span class="roster-icon" aria-hidden="true">📋</span></div><div class="leaderboard" id="leaderboard"></div><div class="summary-actions"><button type="button" id="replay-button" class="primary-button">🎡 CHƠI VÒNG MỚI</button><button type="button" id="edit-button" class="outline-button">✏️ ĐỔI NGƯỜI CHƠI</button></div></div></div>
       </section>
     </main>
-    <footer class="footer"><span>✨ Tân Hiệp · Vui một chút, gắn kết nhiều hơn</span><span>V1.0 · Chơi công bằng, không trùng số</span></footer>
+    <footer class="footer"><span>✨ Tân Hiệp · Vui một chút, gắn kết nhiều hơn</span><span>V1.1 · Quay độc lập, trùng số quay lại</span></footer>
   </div>
   <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
   <div role="status" id="toast" class="toast" aria-live="polite"></div>

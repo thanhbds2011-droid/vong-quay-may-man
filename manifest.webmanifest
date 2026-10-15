@@ -1,7 +1,7 @@
 {
   "name": "Vòng quay may mắn – Ai bao nước hôm nay?",
   "short_name": "Ai bao nước?",
-  "description": "Vòng quay số vui nhộn, một thiết bị, chơi công bằng, không trùng số.",
+  "description": "Vòng quay số vui nhộn, một thiết bị, quay độc lập, lọc số trùng và quay lại.",
   "lang": "vi",
   "id": "./",
   "start_url": "./",

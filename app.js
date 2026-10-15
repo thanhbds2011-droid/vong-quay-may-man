@@ -1,6 +1,6 @@
 'use strict';
 
-// Vòng quay may mắn · Trung tâm Bảo trợ xã hội Tân Hiệp · v1.0
+// Vòng quay may mắn · Trung tâm Bảo trợ xã hội Tân Hiệp · v1.1
 // All game data stays in this browser. No Firebase, accounts, third-party scripts or analytics.
 const STORAGE_KEY = 'tanhiep-water-wheel-v1';
 const MIN_PLAYERS = 2;
@@ -14,12 +14,18 @@ const formatNumber = number => String(number).padStart(2, '0');
 const clone = value => JSON.parse(JSON.stringify(value));
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
+let migrationNotice = false;
+
 function initialState() {
   return {
-    v: 1,
+    v: 2,
     phase: 'setup',
     draftNames: Array.from({ length: 5 }, () => ''),
     players: [],
+    // Each stage includes only players who must spin. A stage is assessed AFTER
+    // everyone in that stage has spun independently, using the SAME eligible set.
+    queue: [],
+    stage: 1,
     currentIndex: 0,
     rotation: 0,
     pending: null,
@@ -32,34 +38,63 @@ function initialState() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!saved || saved.v !== 1 || !Array.isArray(saved.draftNames) || !Array.isArray(saved.players)) return initialState();
+    if (!saved || ![1, 2].includes(saved.v) || !Array.isArray(saved.draftNames) || !Array.isArray(saved.players)) return initialState();
     const clean = { ...initialState(), ...saved };
     clean.draftNames = saved.draftNames.slice(0, MAX_PLAYERS).map(value => String(value ?? '').slice(0, 50));
     if (clean.draftNames.length < MIN_PLAYERS) clean.draftNames = Array.from({ length: 5 }, () => '');
     clean.history = Array.isArray(saved.history) ? saved.history.slice(0, MAX_HISTORY) : [];
     clean.sound = saved.sound !== false;
-    if (!['setup', 'ready', 'spinning', 'revealed', 'complete'].includes(clean.phase)) clean.phase = 'setup';
-    if (!Array.isArray(clean.players) || clean.players.length < MIN_PLAYERS || clean.players.length > MAX_PLAYERS) clean.phase = 'setup';
+    if (saved.v === 1) {
+      // V1 used a different draw rule (without replacement). Never silently
+      // resume those partly assigned numbers under V1.1. Keep names/history.
+      migrationNotice = ['ready', 'spinning', 'revealed'].includes(saved.phase);
+      if (saved.players.length) clean.draftNames = saved.players.map(p => String(p.name ?? '').slice(0, 50));
+      clean.v = 2;
+      clean.phase = 'setup';
+      clean.players = [];
+      clean.queue = [];
+      clean.pending = null;
+      clean.rotation = 0;
+      clean.currentIndex = 0;
+      clean.stage = 1;
+      clean.roundId = null;
+      return clean;
+    }
+    if (!['setup', 'ready', 'spinning', 'revealed', 'review', 'complete'].includes(clean.phase)) clean.phase = 'setup';
+    if (clean.phase !== 'setup') {
+      if (clean.players.length < MIN_PLAYERS || clean.players.length > MAX_PLAYERS ||
+          !Array.isArray(clean.queue) || !clean.queue.length ||
+          !clean.queue.every((index, i) => Number.isInteger(index) && index >= 0 && index < clean.players.length && clean.queue.indexOf(index) === i) ||
+          !Number.isInteger(clean.currentIndex) || clean.currentIndex < 0 || clean.currentIndex > clean.queue.length ||
+          !Number.isInteger(clean.stage) || clean.stage < 1 ||
+          clean.players.some(player => !player || !['waiting','locked','duplicate','drawn'].includes(player.status) ||
+            (player.number !== null && (!Number.isInteger(player.number) || player.number < 1 || player.number > clean.players.length)))) {
+        clean.phase = 'setup';
+        clean.players = [];
+        clean.pending = null;
+      }
+    }
     if (!Number.isFinite(clean.rotation)) clean.rotation = 0;
-    if (!Number.isInteger(clean.currentIndex) || clean.currentIndex < 0 || clean.currentIndex > clean.players.length) clean.phase = 'setup';
-    // A result is chosen and persisted before the animation begins. If the browser reloads
-    // mid-spin, commit that same result exactly once; never reroll or lose the number.
+    // A chosen result is committed BEFORE animation. Reload during the spin
+    // reveals the exact same persisted number (no second draw).
     if (clean.phase === 'spinning') {
-      const p = clean.pending;
-      const player = clean.players[clean.currentIndex];
-      const valid = p && player && Number.isInteger(p.number) &&
-        p.number >= 1 && p.number <= clean.players.length &&
-        Number.isFinite(p.targetRotation) &&
-        !clean.players.some((item, index) => index !== clean.currentIndex && item.number === p.number) &&
-        (player.number == null || player.number === p.number);
+      const pick = clean.pending;
+      const player = clean.players[clean.queue[clean.currentIndex]];
+      const locked = new Set(clean.players.filter(p => p.status === 'locked').map(p => p.number));
+      const valid = pick && player && player.id === pick.personId && pick.stage === clean.stage &&
+        player.number === null && Number.isInteger(pick.number) &&
+        pick.number >= 1 && pick.number <= clean.players.length && !locked.has(pick.number) &&
+        Number.isFinite(pick.targetRotation);
       if (valid) {
-        player.number = p.number;
-        clean.rotation = p.targetRotation;
+        player.number = pick.number;
+        player.status = 'drawn';
+        clean.rotation = pick.targetRotation;
         clean.pending = null;
         clean.phase = 'revealed';
       } else {
         clean.phase = 'setup';
         clean.pending = null;
+        clean.players = [];
       }
     }
     return clean;
@@ -157,9 +192,19 @@ function secureIndex(length) {
   return values[0] % length;
 }
 
-function getRemainingNumbers() {
-  const used = new Set(state.players.map(player => player.number).filter(value => value != null));
-  return Array.from({ length: state.players.length }, (_, i) => i + 1).filter(value => !used.has(value));
+function currentPlayer() {
+  return state.players[state.queue[state.currentIndex]];
+}
+
+function lockedNumbers() {
+  return state.players.filter(player => player.status === 'locked').map(player => player.number);
+}
+
+// IMPORTANT: Picks are independent WITH replacement within the same stage.
+// Only numbers locked by completed previous stages are excluded.
+function eligibleNumbers() {
+  const locked = new Set(lockedNumbers());
+  return Array.from({ length: state.players.length }, (_, i) => i + 1).filter(n => !locked.has(n));
 }
 
 function initGame(names) {
@@ -171,8 +216,12 @@ function initGame(names) {
   state.players = names.map((raw, index) => ({
     id: `person-${index + 1}`,
     name: String(raw ?? '').trim().slice(0, 50) || `Người ${index + 1}`,
-    number: null
+    number: null,
+    status: 'waiting',
+    previousDuplicate: null
   }));
+  state.queue = state.players.map((_, index) => index);
+  state.stage = 1;
   state.currentIndex = 0;
   state.rotation = 0;
   state.pending = null;
@@ -202,15 +251,14 @@ function rotateTarget(index, count, previous) {
 
 async function spin() {
   if (state.phase !== 'ready') return;
-  const current = state.players[state.currentIndex];
-  const remaining = getRemainingNumbers();
-  if (!current || current.number != null || remaining.length === 0) return;
+  const current = currentPlayer();
+  const eligible = eligibleNumbers();
+  if (!current || current.number != null || eligible.length === 0) return;
 
-  const number = remaining[secureIndex(remaining.length)];
+  const number = eligible[secureIndex(eligible.length)];
   const targetRotation = rotateTarget(number - 1, state.players.length, state.rotation);
-  state.pending = { number, targetRotation, personId: current.id };
+  state.pending = { number, targetRotation, personId: current.id, stage: state.stage };
   state.phase = 'spinning';
-  // Durably save the result first, before any animation. Double clicks are ignored.
   persist();
   render();
   const ownGuard = spinGuard;
@@ -244,51 +292,100 @@ function finalizeSpin() {
   if (state.phase !== 'spinning' || !state.pending) return;
   clearTimeout(tickTimer);
   const pending = state.pending;
-  const current = state.players[state.currentIndex];
-  if (!current || current.id !== pending.personId) {
+  const current = currentPlayer();
+  if (!current || current.id !== pending.personId || pending.stage !== state.stage) {
     showToast('Không khớp lượt quay; vui lòng tải lại trang.');
     return;
   }
   current.number = pending.number;
+  current.status = 'drawn';
+  current.previousDuplicate = null;
   state.rotation = pending.targetRotation;
   state.pending = null;
   state.phase = 'revealed';
   persist();
   playChime();
   render();
-  if (state.currentIndex === state.players.length - 1) scheduleFinalReveal();
+  if (state.currentIndex === state.queue.length - 1) scheduleStageReview();
 }
 
-function scheduleFinalReveal() {
+function scheduleStageReview() {
   clearTimeout(finalTimer);
   finalTimer = setTimeout(() => {
-    if (state.phase === 'revealed' && state.currentIndex === state.players.length - 1) completeRound();
+    if (state.phase === 'revealed' && state.currentIndex === state.queue.length - 1) assessStage();
   }, FINAL_REVEAL_MS);
 }
 
 function nextTurn() {
   if (state.phase !== 'revealed') return;
-  if (state.currentIndex >= state.players.length - 1) {
-    completeRound();
+  clearTimeout(finalTimer);
+  if (state.currentIndex >= state.queue.length - 1) {
+    assessStage();
     return;
   }
-  clearTimeout(finalTimer);
   state.currentIndex += 1;
   state.phase = 'ready';
   persist();
   render();
 }
 
+function assessStage() {
+  if (state.phase !== 'revealed' || state.currentIndex !== state.queue.length - 1) return;
+  if (state.queue.some(i => state.players[i].number == null)) return;
+  clearTimeout(finalTimer);
+  const counts = new Map();
+  state.queue.forEach(i => counts.set(state.players[i].number, (counts.get(state.players[i].number) || 0) + 1));
+  let duplicates = 0;
+  state.queue.forEach(i => {
+    const player = state.players[i];
+    if (counts.get(player.number) > 1) {
+      player.status = 'duplicate';
+      duplicates += 1;
+    } else {
+      player.status = 'locked';
+    }
+  });
+  if (duplicates === 0) {
+    completeRound();
+  } else {
+    state.phase = 'review';
+    persist();
+    render();
+    showToast(`${duplicates} người trùng số! Các bạn này sẽ cùng quay vòng phụ.`);
+  }
+}
+
+function nextStage() {
+  if (state.phase !== 'review') return;
+  const reroll = state.players.map((player, index) => player.status === 'duplicate' ? index : -1).filter(i => i >= 0);
+  if (reroll.length < 2) return;
+  cancelTimers();
+  reroll.forEach(i => {
+    state.players[i].previousDuplicate = state.players[i].number;
+    state.players[i].number = null;
+    state.players[i].status = 'waiting';
+  });
+  state.stage += 1;
+  state.queue = reroll;
+  state.currentIndex = 0;
+  state.phase = 'ready';
+  state.pending = null;
+  // Keep the previous spin orientation so the wheel does not snap in place.
+  persist();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function completeRound() {
-  if (state.phase === 'complete' || state.phase !== 'revealed') return;
-  if (state.players.some(player => player.number == null)) return;
+  if (state.phase === 'complete' || state.players.some(p => p.status !== 'locked')) return;
   clearTimeout(finalTimer);
   state.phase = 'complete';
-  state.currentIndex = state.players.length;
+  state.currentIndex = state.queue.length;
   if (!state.history.some(entry => entry.id === state.roundId)) {
     const snapshot = {
       id: state.roundId,
       completedAt: Date.now(),
+      stages: state.stage,
       players: state.players.map(player => ({ name: player.name, number: player.number }))
     };
     state.history.unshift(snapshot);
@@ -302,7 +399,7 @@ function completeRound() {
 }
 
 function confirmDiscard() {
-  if (state.phase === 'ready' || state.phase === 'spinning' || state.phase === 'revealed') {
+  if (['ready', 'spinning', 'revealed', 'review'].includes(state.phase)) {
     return confirm('Bạn muốn dừng vòng hiện tại? Những kết quả của vòng chưa hoàn thành sẽ bị hủy.');
   }
   return true;
@@ -322,6 +419,8 @@ function startNewRound(reusePlayers) {
     state.currentIndex = 0;
     state.rotation = 0;
     state.pending = null;
+    state.queue = [];
+    state.stage = 1;
     state.roundId = null;
     persist();
     render();
@@ -378,7 +477,7 @@ function drawWheel(canvas, count, usedNumbers) {
     if (used.has(number) && count <= 12) {
       ctx.font = `800 ${count > 8 ? 18 : 23}px system-ui, sans-serif`;
       ctx.fillStyle = '#96959e';
-      ctx.fillText('ĐÃ QUAY', x, y + fontSize * .59);
+      ctx.fillText('ĐÃ CHỐT', x, y + fontSize * .59);
     }
   }
   ctx.beginPath();
@@ -387,52 +486,81 @@ function drawWheel(canvas, count, usedNumbers) {
   ctx.lineWidth = 10;
   ctx.stroke();
   ctx.restore();
-  canvas.setAttribute('aria-label', `Vòng quay ${count} số. Số đã quay: ${used.size ? [...used].sort((a,b)=>a-b).join(', ') : 'chưa có'}.`);
+  canvas.setAttribute('aria-label', `Vòng quay ${count} số. Số đã chốt: ${used.size ? [...used].sort((a,b)=>a-b).join(', ') : 'chưa có'}.`);
 }
 
 function renderGame() {
   const players = state.players;
-  const current = players[state.currentIndex];
-  const taken = players.filter(player => player.number != null).length;
+  const current = currentPlayer();
+  const stageQueue = state.queue;
+  const locked = lockedNumbers();
+  const drawnCount = stageQueue.filter(i => players[i].number != null).length;
   const spinning = state.phase === 'spinning';
   const revealed = state.phase === 'revealed';
-  drawWheel($('game-wheel'), players.length, players.map(player => player.number).filter(value => value != null));
+  const review = state.phase === 'review';
+  const secondary = state.stage > 1;
+  drawWheel($('game-wheel'), players.length, locked);
   const rotor = $('spinner-rotor');
   rotor.style.transition = 'none';
   rotor.style.transform = `rotate(${state.rotation}deg)`;
 
-  $('current-name').textContent = current?.name ?? '';
-  $('spin-status-text').textContent = spinning ? 'Vòng quay đang chạy...' : revealed ? 'Đã có kết quả!' : 'Sẵn sàng quay';
-  $('turn-counter').textContent = `LƯỢT ${state.currentIndex + 1} / ${players.length}`;
-  $('game-guidance').textContent = spinning ? 'Hồi hộp một chút nhé...' : revealed ? 'Xem con số của bạn ở bên dưới!' : 'Nhấn nút để thử vận may của bạn!';
-  $('spin-button').disabled = spinning;
-  $('spin-button').hidden = revealed;
+  $('current-name').textContent = review ? 'Đã hoàn tất lượt quay' : current?.name ?? '';
+  $('spin-status-text').textContent = review ? 'Đã phát hiện kết quả trùng' : spinning ? 'Vòng quay đang chạy...' : revealed ? 'Đã có kết quả!' : 'Sẵn sàng quay';
+  $('turn-counter').textContent = `${secondary ? `VÒNG PHỤ ${state.stage - 1}` : 'VÒNG ĐẦU'} · ${review ? stageQueue.length : state.currentIndex + 1}/${stageQueue.length}`;
+  $('game-guidance').textContent = review ? 'Kiểm tra kết quả và bắt đầu vòng phụ!' : spinning ? 'Hồi hộp một chút nhé...' : revealed ? 'Xem con số của bạn ở bên dưới!' : secondary ? 'Chỉ quay trong các số chưa có người giữ cố định.' : 'Tất cả người chơi đều có thể trúng bất kỳ số nào từ 1 đến N.';
+  $('spin-button').disabled = spinning || review || revealed;
+  $('spin-button').hidden = review || revealed;
   $('spin-button').textContent = spinning ? '⏳ ĐANG QUAY...' : '🎯 QUAY MAY MẮN!';
-  $('progress-fraction').textContent = `${taken} / ${players.length}`;
-  $('progress-bar').style.width = `${taken * 100 / players.length}%`;
+  $('progress-fraction').textContent = `${drawnCount} / ${stageQueue.length}`;
+  $('progress-bar').style.width = `${100 * drawnCount / stageQueue.length}%`;
+  $('progress-label').textContent = secondary ? `Tiến độ vòng phụ ${state.stage - 1}` : 'Tiến độ vòng đầu';
+  $('wheel-legend').textContent = secondary ? '✨ Ô mờ đã được giữ cố định. Người quay vòng phụ được chọn độc lập trong các số còn lại.' : '✨ Vòng đầu mọi người đều có thể trúng số giống nhau. Chỉ lọc trùng sau khi cả nhóm quay xong.';
 
   const roster = $('game-roster');
   roster.replaceChildren();
   players.forEach((player, index) => {
-    const done = player.number != null;
-    const active = index === state.currentIndex && !done;
-    const item = makeElement('div', `game-person${done ? ' done' : ''}${active ? ' current' : ''}`);
+    const done = player.status === 'locked';
+    const duplicate = player.status === 'duplicate';
+    const drawn = player.status === 'drawn';
+    const active = stageQueue[state.currentIndex] === index && !review && !drawn && !done;
+    const item = makeElement('div', `game-person${done ? ' done' : ''}${active ? ' current' : ''}${duplicate ? ' duplicate' : ''}`);
     const avatar = makeElement('div', 'game-person-avatar', String(index + 1));
     const body = makeElement('div', 'game-person-body');
     const name = makeElement('span', 'game-person-name', player.name);
-    const sub = makeElement('span', 'game-person-state', done ? '✓ Đã quay' : active ? spinning ? '🎡 Đang quay...' : '● Đến lượt quay' : 'Chưa đến lượt');
-    const result = makeElement('div', `game-person-result${!done ? ' pending' : ''}`, done ? formatNumber(player.number) : '—');
+    let label;
+    if (done) label = '✓ Giữ số · Đã chốt';
+    else if (duplicate) label = '🔁 Trùng số · Quay lại';
+    else if (drawn) label = '🎲 Đã quay · Chờ kiểm tra trùng';
+    else if (active) label = spinning ? '🎡 Đang quay...' : '● Đến lượt quay';
+    else if (secondary && player.previousDuplicate != null) label = `🔁 Đã trùng ${formatNumber(player.previousDuplicate)} · Chờ quay lại`;
+    else label = 'Chưa đến lượt';
+    const sub = makeElement('span', 'game-person-state', label);
+    const result = makeElement('div', `game-person-result${player.number == null ? ' pending' : ''}`, player.number == null ? '—' : formatNumber(player.number));
     body.append(name, sub);
     item.append(avatar, body, result);
     roster.append(item);
   });
+
   $('result-card').hidden = !revealed;
+  $('review-card').hidden = !review;
   if (revealed) {
     $('result-person').textContent = current.name;
     $('result-number').textContent = formatNumber(current.number);
-    const last = state.currentIndex === players.length - 1;
-    $('continue-button').textContent = last ? '🏆 XEM TỔNG KẾT NGAY' : 'TIẾP TỤC NGƯỜI TIẾP THEO →';
+    const last = state.currentIndex === stageQueue.length - 1;
+    $('continue-button').textContent = last ? '🔍 KIỂM TRA SỐ TRÙNG' : 'TIẾP TỤC NGƯỜI TIẾP THEO →';
     $('auto-summary-note').hidden = !last;
+    $('auto-summary-note').textContent = 'Hệ thống sẽ kiểm tra số trùng sau ít giây...';
+  }
+  if (review) {
+    const duplicates = players.filter(p => p.status === 'duplicate');
+    const groups = new Map();
+    duplicates.forEach(p => {
+      if (!groups.has(p.number)) groups.set(p.number, []);
+      groups.get(p.number).push(p.name);
+    });
+    $('review-title').textContent = `${duplicates.length} NGƯỜI TRÙNG SỐ!`;
+    $('review-message').textContent = [...groups].sort((a,b) => a[0]-b[0]).map(([number, names]) => `Số ${formatNumber(number)}: ${names.join(', ')}`).join(' · ');
+    $('next-stage-button').textContent = `🔁 QUAY VÒNG PHỤ ${state.stage}`;
   }
 }
 
@@ -573,6 +701,7 @@ function setupActions() {
   $('start-button').addEventListener('click', () => initGame(state.draftNames));
   $('spin-button').addEventListener('click', spin);
   $('continue-button').addEventListener('click', nextTurn);
+  $('next-stage-button').addEventListener('click', nextStage);
   $('reset-active').addEventListener('click', () => startNewRound(true));
   $('replay-button').addEventListener('click', () => startNewRound(true));
   $('edit-button').addEventListener('click', () => startNewRound(false));
@@ -623,12 +752,13 @@ function setupActions() {
 function boot() {
   setupActions();
   render();
-  if (state.phase === 'revealed' && state.currentIndex === state.players.length - 1) scheduleFinalReveal();
+  if (state.phase === 'revealed' && state.currentIndex === state.queue.length - 1) scheduleStageReview();
   // PWA is optional. Local file previews also work, except service worker installation.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(error => console.info('PWA không được đăng ký:', error)));
   }
   persist();
+  if (migrationNotice) showToast('V1.1 đã giữ lịch sử và tên người chơi; vòng V1.0 đang dở cần bắt đầu lại theo luật mới.');
 }
 
 boot();
